@@ -2,6 +2,6 @@
 !.gitignore
 !requirements.txt
 !main.py
-!tests
-!tests/310_OS1_03052021.E2E
-!tests/310_OS1_06022021.E2E
+!register_oct.py
+!tests\310_OS1_03052021.tiff
+!tests\310_OS1_06022021.tiff

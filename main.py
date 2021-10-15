@@ -4,8 +4,9 @@ import imageio
 import numpy as np
 import argparse
 from tqdm import tqdm
+from register_oct import register_volume
 
-def e2e_to_tiff(file_name,gamma=1,subcall=False):
+def e2e_to_tiff(file_name,register=True,gamma=1,subcall=False):
     ext = '.tiff'
     folder,file = os.path.split(file_name)
     export_name = f'{folder}{os.sep}{file[:-4]}{ext}'
@@ -21,20 +22,22 @@ def e2e_to_tiff(file_name,gamma=1,subcall=False):
         for i,oct in enumerate(oct_volumes):
             suffix = f'-{i}' if i>0 else ''
             nframes = len(oct.volume)
-            vol_out = np.dstack(oct.volume)
+            scans = [x[np.newaxis,:,:] for x in oct.volume]
+            vol_out = np.vstack(scans)
             vol_out = vol_out/256   #renormalize to 1
             vol_out = pow(vol_out,gamma)
             vol_out = vol_out*65535 #scale to 16bit
             vol_out = vol_out.astype(np.uint16)
-            fstack_out = [vol_out[:,:,i] for i in range(nframes)]
+            reg_vol_out,shifts = register_volume(vol_out)
+            fstack_out = [reg_vol_out[i,:,:] for i in range(nframes)]
             imageio.mimwrite(f'{export_name}{suffix}', fstack_out)
             pbar.update(update_amount)
         pbar.update(25)
         tqdm.write(f"{export_name}: Exported")
 
-def convert_folder(folder,gamma=1):
+def convert_folder(folder,register=True,gamma=1):
     for f in tqdm(glob.glob(rf'{folder}\*.e2e')):
-        e2e_to_tiff(f,gamma=gamma,subcall=True)
+        e2e_to_tiff(f,register,gamma=gamma,subcall=True)
 
 def run_tests():
     convert_folder(r".\tests")
@@ -57,9 +60,14 @@ if __name__=="__main__":
     parser.add_argument('--test', 
                         help="run tests",
                         default=False,
-                        action='store_true')                    
+                        action='store_true')
+    parser.add_argument('--no-register', 
+                        help="register oct",
+                        default=False,
+                        action='store_true')                   
     args = parser.parse_args()
-    print(args)      
+    print(args)   
+    register_oct = not args.no_register
     if args.test:
         run_tests()
     else:
@@ -72,7 +80,7 @@ if __name__=="__main__":
                                         title = 'Select an .e2e file',
                                         filetypes = [("OCT File","*.e2e")]
                                         )
-            e2e_to_tiff(file_name)
+            e2e_to_tiff(file_name,register=register_oct)
         else:
             folder_selected = filedialog.askdirectory(parent=root,
                                     initialdir=configs['initial_dir'],
@@ -80,4 +88,4 @@ if __name__=="__main__":
             if folder_selected != '':
                 directory = folder_selected
             
-            convert_folder(folder_selected)
+            convert_folder(folder_selected,register=register_oct)
